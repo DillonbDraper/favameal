@@ -13,10 +13,10 @@ from favamealapi.views.restaurant import RestaurantSerializer
 class MealSerializer(serializers.ModelSerializer):
     """JSON serializer for meals"""
     restaurant = RestaurantSerializer(many=False)
-
+    # Properties for later: 'user_rating', 'avg_rating'
     class Meta:
         model = Meal
-        fields = ('id', 'name', 'restaurant', 'user_rating', 'avg_rating')
+        fields = ('id', 'name', 'restaurant', 'favorite' )
 
 
 class MealView(ViewSet):
@@ -53,11 +53,16 @@ class MealView(ViewSet):
             # TODO: Get the rating for current user and assign to `user_rating` property
 
             # TODO: Get the average rating for requested meal and assign to `avg_rating` property
+            try:
+                FavoriteMeal.objects.get(
+                    meal=meal, user=request.auth.user)
+                meal.favorite = True
 
-            # TODO: Assign a value to the `is_favorite` property of requested meal
+            except FavoriteMeal.DoesNotExist:
+                meal.favorite = False
+            
 
-
-            serializer = RestaurantSerializer(
+            serializer = MealSerializer(
                 meal, context={'request': request})
             return Response(serializer.data)
         except Exception as ex:
@@ -76,6 +81,16 @@ class MealView(ViewSet):
         # TODO: Get the average rating for each meal and assign to `avg_rating` property
 
         # TODO: Assign a value to the `is_favorite` property of each meal
+        
+        for meal in meals:
+            meal.favorite = None
+            try:
+                FavoriteMeal.objects.get(
+                    meal=meal, user=request.auth.user)
+                meal.favorite = True
+
+            except FavoriteMeal.DoesNotExist:
+                meal.favorite = False
 
         serializer = MealSerializer(
             meals, many=True, context={'request': request})

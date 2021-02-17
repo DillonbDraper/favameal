@@ -106,5 +106,45 @@ class MealView(ViewSet):
 
 
 
-    # TODO: Add a custom action named `star` that will allow a client to send a
-    #  POST and a DELETE request to /meals/3/star.
+    
+    @action(methods=['post', 'delete'], detail=True)
+    def star(self, request, pk=None):
+
+        if request.method == "POST":
+            meal = Meal.objects.get(pk=pk)
+            try:
+                favorite = FavoriteMeal.objects.get(meal=meal, user=request.auth.user)
+                return Response(
+                    {'message': 'Already a favorite'},
+                    status=status.HTTP_422_UNPROCESSABLE_ENTITY
+                )
+            except FavoriteMeal.DoesNotExist: 
+                favorite = FavoriteMeal()
+                favorite.user = request.auth.user
+                favorite.meal = meal
+                favorite.save()
+
+                return Response({}, status=status.HTTP_201_CREATED)
+
+        elif request.method == "DELETE":
+
+            try:
+                meal = Meal.objects.get(pk=pk)
+            except Meal.DoesNotExist:
+                return Response(
+                    {'message': 'Favorite does not exist.'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+            try: 
+                favorite = FavoriteMeal.objects.get(meal=meal, user = request.auth.user)
+                favorite.delete()
+                return Response(None, status=status.HTTP_204_NO_CONTENT)
+            except FavoriteMeal.DoesNotExist:
+                return Response({'message': 'Not currently favorited.'},
+                status=status.HTTP_404_NOT_FOUND
+                )
+
+
+        return Response({}, status=status.HTTP_405_METHOD_NOT_ALLOWED)
+

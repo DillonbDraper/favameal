@@ -16,7 +16,7 @@ class MealSerializer(serializers.ModelSerializer):
     # Properties for later: 'user_rating', 'avg_rating'
     class Meta:
         model = Meal
-        fields = ('id', 'name', 'restaurant', 'favorite' )
+        fields = ('id', 'name', 'restaurant', 'favorite', 'user_rating', 'avg_rating', )
 
 
 class MealView(ViewSet):
@@ -51,6 +51,11 @@ class MealView(ViewSet):
             meal = Meal.objects.get(pk=pk)
 
             # TODO: Get the rating for current user and assign to `user_rating` property
+            try: 
+                meal_rating = MealRating.objects.get(meal=meal, user=request.auth.user)
+                meal.user_rating = meal_rating.rating
+            except MealRating.DoesNotExist:
+                meal.user_rating = 0
 
             # TODO: Get the average rating for requested meal and assign to `avg_rating` property
             try:
@@ -80,7 +85,6 @@ class MealView(ViewSet):
 
         # TODO: Get the average rating for each meal and assign to `avg_rating` property
 
-        # TODO: Assign a value to the `is_favorite` property of each meal
         
         for meal in meals:
             meal.favorite = None
@@ -103,10 +107,46 @@ class MealView(ViewSet):
     #           "rating": 3
     #       }
 
+    @action(methods=['post', 'put'], detail=True)
+    def rate(self, request, pk=None):
+
+        if request.method == "POST":
+            meal = Meal.objects.get(pk=pk)
+            try: 
+                rating = MealRating.objects.get(meal=meal, user=request.auth.user)
+                return Response(
+                    {'message': 'Already been rated'},
+                    status=status.HTTP_422_UNPROCESSABLE_ENTITY
+                )
+            except MealRating.DoesNotExist:
+                rating = MealRating()
+                rating.user = request.auth.user
+                rating.meal = meal
+                rating.rating = request.data['rating']
+                rating.save()
+
+                return Response({}, status=status.HTTP_201_CREATED)
+
+        elif request.method == "PUT":
+            meal = Meal.objects.get(pk=pk)
+            try:
+                rating = MealRating.objects.get(meal=meal, user=request.auth.user)
+                rating.user = request.auth.user
+                rating.meal = meal
+                rating.rating = request.data['rating']
+                rating.save()
+                return Response({}, status=status.HTTP_204_NO_CONTENT)
+            except MealRating.DoesNotExist:
+                return Response({'message': 'Cannot edit that which does not exist'},
+                status=status.HTTP_404_NOT_FOUND)
 
 
 
-    
+
+
+
+
+
     @action(methods=['post', 'delete'], detail=True)
     def star(self, request, pk=None):
 

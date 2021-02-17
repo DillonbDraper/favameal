@@ -2,6 +2,7 @@
 from django.core.exceptions import ValidationError
 from django.http import HttpResponseServerError
 from rest_framework import serializers, status
+from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.viewsets import ViewSet
 from favamealapi.models import Restaurant
@@ -55,12 +56,13 @@ class RestaurantView(ViewSet):
         try:
             restaurant = Restaurant.objects.get(pk=pk)
 
-            if request.auth.user in FavoriteRestaurant.objects.get(user=request.auth.user):
+            try:
+                FavoriteRestaurant.objects.get(
+                    restaurant=restaurant, user=request.auth.user)
                 restaurant.favorite = True
-            else:
-                restaurant.favorite = False
 
-            # TODO: Add the correct value to the `favorite` property of the requested restaurant
+            except FavoriteRestaurant.DoesNotExist:
+                restaurant.favorite = False
 
             serializer = RestaurantSerializer(
                 restaurant, context={'request': request})
@@ -94,3 +96,45 @@ class RestaurantView(ViewSet):
 
     # TODO: Write a custom action named `star` that will allow a client to
     # send a POST and a DELETE request to /restaurant/2/star
+
+    @action(methods=['post', 'delete'], detail=True)
+    def star(self, request, pk=None):
+
+        if request.method == "POST":
+            restaurant = Restaurant.objects.get(pk=pk)
+            try:
+                favorite = FavoriteRestaurant.objects.get(restaurant=restaurant, user=request.auth.user)
+                return Response(
+                    {'message': 'Already a favorite'},
+                    status=status.HTTP_422_UNPROCESSABLE_ENTITY
+                )
+            except FavoriteRestaurant.DoesNotExist: 
+                favorite = FavoriteRestaurant()
+                favorite.user = request.auth.user
+                favorite.restaurant = restaurant
+                favorite.save()
+
+                return Response({}, status=status.HTTP_201_CREATED)
+
+        elif request.method == "DELETE":
+
+            try:
+                restaurant = Restaurant.objects.get(pk=pk)
+            except Restaurant.DoesNotExist:
+                return Response(
+                    {'message': 'Favorite does not exist.'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+            try: 
+                favorite = FavoriteRestaurant.objects.get(restaurant=restaurant, user = request.auth.user)
+                favorite.delete()
+                return Response(None, status=status.HTTP_204_NO_CONTENT)
+            except FavoriteRestaurant.DoesNotExist:
+                return Response({'message': 'Not currently favorited.'},
+                status=status.HTTP_404_NOT_FOUND
+                )
+
+
+        return Response({}, status=status.HTTP_405_METHOD_NOT_ALLOWED)
+

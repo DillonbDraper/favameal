@@ -7,5 +7,5 @@ class Meal(models.Model):
     restaurant = models.ForeignKey("Restaurant", on_delete=models.CASCADE)
 
     # TODO: Add an user_rating custom properties
-
+    
     # TODO: Add an avg_rating custom properties

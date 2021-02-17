@@ -15,6 +15,7 @@ class RestaurantSerializer(serializers.ModelSerializer):
         model = Restaurant
         fields = ('id', 'name', 'address', 'favorite',)
 
+
 class FaveSerializer(serializers.ModelSerializer):
     """JSON serializer for favorites"""
 
@@ -54,6 +55,11 @@ class RestaurantView(ViewSet):
         try:
             restaurant = Restaurant.objects.get(pk=pk)
 
+            if request.auth.user in FavoriteRestaurant.objects.get(user=request.auth.user):
+                restaurant.favorite = True
+            else:
+                restaurant.favorite = False
+
             # TODO: Add the correct value to the `favorite` property of the requested restaurant
 
             serializer = RestaurantSerializer(
@@ -70,10 +76,19 @@ class RestaurantView(ViewSet):
         """
         restaurants = Restaurant.objects.all()
 
-        # TODO: Add the correct value to the `favorite` property of each restaurant
+        for restaurant in restaurants:
+            restaurant.favorite = None
 
+            try:
+                FavoriteRestaurant.objects.get(
+                    restaurant=restaurant, user=request.auth.user)
+                restaurant.favorite = True
 
-        serializer = RestaurantSerializer(restaurants, many=True, context={'request': request})
+            except FavoriteRestaurant.DoesNotExist:
+                restaurant.favorite = False
+
+        serializer = RestaurantSerializer(
+            restaurants, many=True, context={'request': request})
 
         return Response(serializer.data)
 
